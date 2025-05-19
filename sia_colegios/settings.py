@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,7 +27,7 @@ SECRET_KEY = 'django-insecure-key-for-development-only'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']  # Permitir todos los hosts en desarrollo
 
 
 # Application definition
@@ -82,54 +83,56 @@ WSGI_APPLICATION = 'sia_colegios.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Configura la contraseña correcta aquí - la que usaste al instalar PostgreSQL
-PG_PASSWORD = os.environ.get('DB_PASSWORD', 'postgres')
+# Obtener variables de entorno con valores por defecto
+DB_NAME = os.environ.get('DB_NAME', 'sia_colegios')
+DB_USER = os.environ.get('DB_USER', 'postgres')
+DB_PASSWORD = os.environ.get('DB_PASSWORD', 'postgres')
+DB_HOST = os.environ.get('DB_HOST', 'localhost')
+DB_PORT = os.environ.get('DB_PORT', '5432')
 
 # Configuración PostgreSQL
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.environ.get('DB_NAME', 'sia_colegios'),
-        'USER': os.environ.get('DB_USER', 'postgres'),
-        'PASSWORD': PG_PASSWORD,
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+        'NAME': DB_NAME,
+        'USER': DB_USER,
+        'PASSWORD': DB_PASSWORD,
+        'HOST': DB_HOST,
+        'PORT': DB_PORT,
         'OPTIONS': {
             'client_encoding': 'UTF8',
         },
+        'CONN_MAX_AGE': 60,  # Mantener conexiones vivas por 60 segundos
+        'ATOMIC_REQUESTS': True,  # Habilitar transacciones atómicas
+        'CONN_HEALTH_CHECKS': True,  # Habilitar verificaciones de salud de conexión
     }
 }
 
-# Configuración SQLite (comentada)
-"""
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-"""
+# Validación de la conexión a la base de datos
+def validate_database_connection():
+    from django.db import connections
+    from django.db.utils import OperationalError
+    try:
+        conn = connections['default']
+        conn.cursor()
+        print("✅ Conexión a PostgreSQL establecida correctamente")
+        print(f"📊 Base de datos: {DB_NAME}")
+        print(f"👤 Usuario: {DB_USER}")
+        print(f"🌐 Host: {DB_HOST}")
+        print(f"🔌 Puerto: {DB_PORT}")
+    except OperationalError as e:
+        print("❌ Error al conectar con PostgreSQL:")
+        print(f"   {str(e)}")
+        print("\nVerifica que:")
+        print("1. PostgreSQL esté instalado y corriendo")
+        print("2. Las credenciales sean correctas")
+        print("3. La base de datos exista")
+        print("4. El usuario tenga los permisos necesarios")
+        sys.exit(1)
 
-# Configuración alternativa con string de conexión directa
-"""
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'OPTIONS': {
-            'dsn': f'dbname=sia_colegios user=postgres password={PG_PASSWORD} host=localhost port=5432',
-        },
-    }
-}
-
-# Configuración SQLite (comentada)
-"""
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
+# Ejecutar validación si no estamos en modo test
+if 'test' not in sys.argv:
+    validate_database_connection()
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -166,6 +169,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -180,7 +184,28 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
 }
 
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True  # Para desarrollo. En producción, configurar correctamente.
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
