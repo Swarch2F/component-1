@@ -1,4 +1,6 @@
 from django.db import models
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 # Create your models here.
 
@@ -9,6 +11,9 @@ class Curso(models.Model):
     
     def __str__(self):
         return self.codigo
+
+    class Meta:
+        ordering = ['codigo']
 
 class Estudiante(models.Model):
     """Modelo para representar un estudiante"""
@@ -21,3 +26,19 @@ class Estudiante(models.Model):
     
     def __str__(self):
         return f"{self.nombre_completo} - {self.documento}"
+    
+    def clean(self):
+        # Validar que la fecha de nacimiento no sea en el futuro
+        if self.fecha_nacimiento and self.fecha_nacimiento > timezone.now().date():
+            raise ValidationError({'fecha_nacimiento': 'La fecha de nacimiento no puede ser en el futuro.'})
+        
+        # Validar que el documento solo contenga números
+        if not self.documento.isdigit():
+            raise ValidationError({'documento': 'El documento debe contener solo números.'})
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+    
+    class Meta:
+        ordering = ['nombre_completo']

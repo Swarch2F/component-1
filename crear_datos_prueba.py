@@ -2,6 +2,11 @@ import os
 import django
 import datetime
 import random
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Configurar entorno Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sia_colegios.settings')
@@ -9,6 +14,13 @@ django.setup()
 
 # Importar modelos después de configurar el entorno
 from gestion_estudiantes.models import Curso, Estudiante
+
+def limpiar_datos():
+    """Limpia todos los datos existentes"""
+    logger.info("Limpiando datos existentes...")
+    Estudiante.objects.all().delete()
+    Curso.objects.all().delete()
+    logger.info("Datos limpiados exitosamente.")
 
 def crear_cursos():
     """Crear cursos de ejemplo"""
@@ -35,19 +47,19 @@ def crear_cursos():
     
     cursos_creados = []
     for curso_data in cursos_data:
-        curso, created = Curso.objects.get_or_create(**curso_data)
-        if created:
-            print(f"Curso creado: {curso.codigo} - {curso.nombre}")
-        else:
-            print(f"Curso ya existente: {curso.codigo} - {curso.nombre}")
-        cursos_creados.append(curso)
+        try:
+            curso = Curso.objects.create(**curso_data)
+            logger.info(f"Curso creado: {curso.codigo} - {curso.nombre}")
+            cursos_creados.append(curso)
+        except Exception as e:
+            logger.error(f"Error al crear curso {curso_data['codigo']}: {e}")
     
     return cursos_creados
 
 def crear_estudiantes(cursos):
     """Crear estudiantes de ejemplo"""
     if not cursos:
-        print("No hay cursos disponibles para crear estudiantes")
+        logger.error("No hay cursos disponibles para crear estudiantes")
         return
     
     # Nombres y apellidos para generar combinaciones aleatorias
@@ -165,35 +177,45 @@ def crear_estudiantes(cursos):
     
     for estudiante_data in estudiantes_data:
         try:
-            estudiante, created = Estudiante.objects.get_or_create(
-                documento=estudiante_data['documento'],
-                defaults=estudiante_data
-            )
-            
-            if created:
-                print(f"Estudiante creado: {estudiante.nombre_completo} - Curso: {estudiante.curso.codigo}")
-            else:
-                print(f"Estudiante ya existente: {estudiante.nombre_completo}")
+            estudiante = Estudiante.objects.create(**estudiante_data)
+            logger.info(f"Estudiante creado: {estudiante.nombre_completo} - Curso: {estudiante.curso.codigo}")
         except Exception as e:
-            print(f"Error al crear estudiante {estudiante_data['nombre_completo']}: {e}")
+            logger.error(f"Error al crear estudiante {estudiante_data['nombre_completo']}: {e}")
 
 def estadisticas():
     """Mostrar estadísticas de los datos cargados"""
     total_cursos = Curso.objects.count()
     total_estudiantes = Estudiante.objects.count()
     
-    print("\n--- ESTADÍSTICAS DE DATOS ---")
-    print(f"Total de cursos: {total_cursos}")
-    print(f"Total de estudiantes: {total_estudiantes}")
-    print("\nEstudiantes por curso:")
+    logger.info("\n--- ESTADÍSTICAS DE DATOS ---")
+    logger.info(f"Total de cursos: {total_cursos}")
+    logger.info(f"Total de estudiantes: {total_estudiantes}")
+    logger.info("\nEstudiantes por curso:")
     
     for curso in Curso.objects.all().order_by('codigo'):
         num_estudiantes = Estudiante.objects.filter(curso=curso).count()
-        print(f"  {curso.codigo} - {curso.nombre}: {num_estudiantes} estudiantes")
+        logger.info(f"  {curso.codigo} - {curso.nombre}: {num_estudiantes} estudiantes")
+
+def main():
+    """Función principal que ejecuta todo el proceso"""
+    try:
+        logger.info("Iniciando creación de datos de prueba para el SIA Colegios...")
+        
+        # Limpiar datos existentes
+        limpiar_datos()
+        
+        # Crear nuevos datos
+        cursos = crear_cursos()
+        crear_estudiantes(cursos)
+        
+        # Mostrar estadísticas
+        estadisticas()
+        
+        logger.info("Proceso completado exitosamente.")
+        return True
+    except Exception as e:
+        logger.error(f"Error durante la creación de datos: {e}")
+        return False
 
 if __name__ == '__main__':
-    print("Creando datos de prueba para el SIA Colegios...")
-    cursos = crear_cursos()
-    crear_estudiantes(cursos)
-    estadisticas()
-    print("Proceso completado.") 
+    main() 
