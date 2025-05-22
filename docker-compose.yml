@@ -18,6 +18,8 @@ services:
       - LOAD_INITIAL_DATA=true
     depends_on:
       - db
+    networks:
+      - sia_network
 
   db:
     image: postgres:17-alpine
@@ -33,6 +35,12 @@ services:
       - POSTGRES_LC_CTYPE=es_CO.utf8
     ports:
       - "5432:5432"
+    networks:
+      - sia_network
 
 volumes:
-  postgres_data: 
+  postgres_data:
+
+networks:
+  sia_network:
+    driver: bridge 
