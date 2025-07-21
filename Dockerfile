@@ -38,4 +38,4 @@ RUN chmod +x /docker-entrypoint.sh
 EXPOSE 8000
 
 # Usar el script de entrada
-ENTRYPOINT ["/docker-entrypoint.sh"] 
+ENTRYPOINT ["/docker-entrypoint.sh", "django"]
