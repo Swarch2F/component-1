@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models.deletion import ProtectedError
 from .models import Curso, Estudiante
-from .serializers import CursoSerializer, EstudianteSerializer, EstudianteDetailSerializer
+from .serializers import CursoSerializer, CursoDetailSerializer, EstudianteSerializer, EstudianteDetailSerializer
 
 class CursoViewSet(viewsets.ModelViewSet):
     """
@@ -16,13 +16,18 @@ class CursoViewSet(viewsets.ModelViewSet):
     search_fields = ['nombre', 'codigo']
     ordering_fields = ['nombre', 'codigo']
     
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return CursoDetailSerializer
+        return CursoSerializer
+    
     @action(detail=True, methods=['get'])
     def estudiantes(self, request, pk=None):
         """
         Obtener todos los estudiantes de un curso específico
         """
         curso = self.get_object()
-        estudiantes = Estudiante.objects.filter(curso=curso)
+        estudiantes = Estudiante.objects.select_related('curso').filter(curso=curso)
         serializer = EstudianteSerializer(estudiantes, many=True)
         return Response(serializer.data)
 
@@ -41,11 +46,18 @@ class EstudianteViewSet(viewsets.ModelViewSet):
     """
     API endpoint para gestionar estudiantes
     """
-    queryset = Estudiante.objects.all()
+    queryset = Estudiante.objects.select_related('curso').all()
     serializer_class = EstudianteSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['nombre_completo', 'documento', 'acudiente']
     ordering_fields = ['nombre_completo', 'fecha_nacimiento', 'fecha_registro']
+    
+    def get_queryset(self):
+        """
+        Optimizado: asegurar que select_related se aplique en todas las consultas
+        incluyendo las de paginación
+        """
+        return Estudiante.objects.select_related('curso').all()
     
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -60,7 +72,7 @@ class EstudianteViewSet(viewsets.ModelViewSet):
         codigo_curso = request.query_params.get('codigo', None)
         if codigo_curso:
             curso = get_object_or_404(Curso, codigo=codigo_curso)
-            estudiantes = Estudiante.objects.filter(curso=curso)
+            estudiantes = Estudiante.objects.select_related('curso').filter(curso=curso)
             serializer = self.get_serializer(estudiantes, many=True)
             return Response(serializer.data)
         return Response({"error": "Debe proporcionar el código del curso"}, status=400)

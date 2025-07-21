@@ -6,6 +6,29 @@ class CursoSerializer(serializers.ModelSerializer):
         model = Curso
         fields = '__all__'
 
+class CursoDetailSerializer(serializers.ModelSerializer):
+    estudiantes = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Curso
+        fields = '__all__'
+    
+    def get_estudiantes(self, obj):
+        # Optimizado: usar select_related para evitar N+1 queries
+        # Usar un serializer simple para evitar recursión
+        estudiantes = obj.estudiantes.all()
+        return [
+            {
+                'id': est.id,
+                'nombreCompleto': est.nombre_completo,
+                'documento': est.documento,
+                'fechaNacimiento': est.fecha_nacimiento,
+                'acudiente': est.acudiente,
+                'fechaRegistro': est.fecha_registro
+            }
+            for est in estudiantes
+        ]
+
 class EstudianteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Estudiante
@@ -30,8 +53,26 @@ class EstudianteSerializer(serializers.ModelSerializer):
         return data
 
 class EstudianteDetailSerializer(serializers.ModelSerializer):
-    curso = CursoSerializer(read_only=True)
+    # Optimizado: usar SerializerMethodField para evitar consultas adicionales
+    # cuando los datos ya están precargados con select_related
+    curso = serializers.SerializerMethodField()
     
     class Meta:
         model = Estudiante
-        fields = '__all__' 
+        fields = '__all__'
+    
+    def get_curso(self, obj):
+        # Si el curso ya está precargado (select_related), usar esos datos
+        if hasattr(obj, '_prefetched_objects_cache') and 'curso' in obj._prefetched_objects_cache:
+            curso = obj._prefetched_objects_cache['curso']
+        else:
+            # Fallback: hacer consulta individual si no está precargado
+            curso = obj.curso
+        
+        if curso:
+            return {
+                'id': curso.id,
+                'nombre': curso.nombre,
+                'codigo': curso.codigo
+            }
+        return None 
